@@ -1,7 +1,6 @@
 package com.httpproxy.util;
 
 import com.httpproxy.pojo.Packet;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

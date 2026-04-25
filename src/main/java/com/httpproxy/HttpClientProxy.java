@@ -1,10 +1,9 @@
 package com.httpproxy;
 
-import com.httpproxy.pojo.HttpRequestRecord;
-import com.httpproxy.pojo.HttpResponseRecord;
-
 import static com.httpproxy.util.Consistant.formatter;
 
+import com.httpproxy.pojo.HttpRequestRecord;
+import com.httpproxy.pojo.HttpResponseRecord;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;

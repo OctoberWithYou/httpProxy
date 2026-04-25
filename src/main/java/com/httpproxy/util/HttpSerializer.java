@@ -46,4 +46,8 @@ public class HttpSerializer {
     String json = GSON.toJson(httpResponseRecord);
     return json.getBytes(StandardCharsets.UTF_8);
   }
+
+  public static HttpResponseRecord deserializeResponse(byte[] data) {
+    return GSON.fromJson(new String(data, StandardCharsets.UTF_8), HttpResponseRecord.class);
+  }
 }

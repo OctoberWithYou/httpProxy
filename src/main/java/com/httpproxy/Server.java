@@ -1,9 +1,8 @@
 package com.httpproxy;
 
-import com.httpproxy.util.SocketProtocol;
-
 import static com.httpproxy.util.Consistant.formatter;
 
+import com.httpproxy.util.SocketProtocol;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;

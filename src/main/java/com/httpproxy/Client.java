@@ -1,12 +1,11 @@
 package com.httpproxy;
 
+import static com.httpproxy.util.Consistant.formatter;
+
 import com.httpproxy.pojo.HttpResponseRecord;
 import com.httpproxy.pojo.Packet;
 import com.httpproxy.util.HttpSerializer;
 import com.httpproxy.util.SocketProtocol;
-
-import static com.httpproxy.util.Consistant.formatter;
-
 import java.io.*;
 import java.security.KeyStore;
 import java.time.LocalDateTime;
