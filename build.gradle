@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.diffplug.spotless' version '8.0.0'
+}
+
+group = 'com.httpproxy'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+spotless {
+    java {
+        target 'src/*/java/**/*.java'  // 指定目标文件
+        googleJavaFormat()             // 使用Google Java风格，例如googleJavaFormat('1.15.0')
+        removeUnusedImports()          // 自动移除未使用的导入
+        trimTrailingWhitespace()       // 去除行尾空白
+        endWithNewline()               // 文件末尾添加新行
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+application {
+    mainClass = 'com.httpproxy.HttpProxyApplication'
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.13.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
