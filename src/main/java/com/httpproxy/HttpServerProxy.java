@@ -13,11 +13,11 @@ import javax.net.ssl.SSLContext;
 
 public class HttpServerProxy {
 
-  private static final int HTTPS_PORT = 8443;
+  private static final int HTTPS_PORT = 443;
   private static final String KEYSTORE_PATH = "keystore.jks";
   private static final String KEYSTORE_PASSWORD = "changeit";
 
-  public static void main(String[] args) throws Exception {
+  public static void start() throws Exception {
     System.out.printf(
         "%s [INFO] Starting HttpServerProxy...%n", LocalDateTime.now().format(formatter));
 
@@ -48,6 +48,7 @@ public class HttpServerProxy {
     // 注册处理器：所有路径都交给 ForwardRequestHandler 处理
     httpsServer.createContext("/", new ForwardRequestHandler());
     httpsServer.setExecutor(threadPool);
+    Single.waitTcpConnect();
     httpsServer.start();
 
     System.out.printf(

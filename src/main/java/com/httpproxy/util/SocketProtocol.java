@@ -41,6 +41,10 @@ public class SocketProtocol {
     byte[] head = new byte[8];
     int readBytes = inputStream.readNBytes(head, 0, 8);
 
+    if (readBytes == -1 || readBytes == 0) {
+      throw new IOException("Connection closed.");
+    }
+
     // 如果连接关闭或数据不足，返回 null
     if (readBytes < 8) {
       return null;

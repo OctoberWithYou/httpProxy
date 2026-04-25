@@ -8,6 +8,7 @@ import com.httpproxy.util.HttpSerializer;
 import com.httpproxy.util.SocketProtocol;
 import java.io.*;
 import java.security.KeyStore;
+import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import javax.net.ssl.*;
 
@@ -29,7 +30,7 @@ public class Client {
    *
    * <p>3. 将 truststore.jks 放在项目根目录或 resources 目录
    */
-  public static void main(String[] args) throws Exception {
+  public static void start() throws Exception {
     var serverHost = "localhost";
     var serverPort = 8443;
     var truststorePath = "truststore.jks";
@@ -74,13 +75,26 @@ public class Client {
       SocketProtocol socketProtocol =
           new SocketProtocol(sslSocket.getInputStream(), sslSocket.getOutputStream());
 
-      Packet receive = socketProtocol.receive();
-      var request = HttpSerializer.deserializeRequest(receive.data());
-      HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
+      while (true) {
+        Packet receive = socketProtocol.receive();
+        System.out.printf(
+            "%s [DEBUG] Received response %s from server%n",
+            LocalDateTime.now().format(formatter), receive);
+        if (receive == null) {
+          continue;
+        }
 
-      byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
+        var request = HttpSerializer.deserializeRequest(receive.data());
+        HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
 
-      socketProtocol.send(new Packet(response));
+        byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
+
+        Packet packet = new Packet(response);
+        System.out.printf(
+            "%s [DEBUG] Sending response %s to server...%n",
+            LocalDateTime.now().format(formatter), packet);
+        socketProtocol.send(packet);
+      }
 
     } catch (SSLHandshakeException e) {
       System.out.printf(
@@ -98,6 +112,8 @@ public class Client {
           "%s [ERROR] Connection Error: %s%n",
           LocalDateTime.now().format(formatter), e.getMessage());
       throw e;
+    } finally {
+      System.out.printf("%s [INFO] Connection closed.%n", LocalDateTime.now().format(formatter));
     }
   }
 
@@ -111,21 +127,44 @@ public class Client {
    */
   private static SSLContext initSSLContext(String truststorePath, String truststorePassword)
       throws Exception {
-    // 加载信任库
-    var trustStore = KeyStore.getInstance("JKS");
-    try (var truststoreFile = new FileInputStream(truststorePath)) {
-      trustStore.load(truststoreFile, truststorePassword.toCharArray());
+    if (false) {
+      // 加载信任库
+      var trustStore = KeyStore.getInstance("JKS");
+      try (var truststoreFile = new FileInputStream(truststorePath)) {
+        trustStore.load(truststoreFile, truststorePassword.toCharArray());
+      }
+
+      // 初始化信任管理器
+      var trustManagerFactory =
+          TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      trustManagerFactory.init(trustStore);
+
+      // 创建并初始化 SSLContext
+      var sslContext = SSLContext.getInstance("TLS");
+      sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
+
+      return sslContext;
+    } else {
+      var trustManagers =
+          new TrustManager[] {
+            new X509TrustManager() {
+              @Override
+              public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+              @Override
+              public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                // 什么都不做，即表示信任任何证书
+              }
+
+              @Override
+              public X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+              }
+            }
+          };
+      SSLContext sc = SSLContext.getInstance("TLS");
+      sc.init(null, trustManagers, new java.security.SecureRandom());
+      return sc;
     }
-
-    // 初始化信任管理器
-    var trustManagerFactory =
-        TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-    trustManagerFactory.init(trustStore);
-
-    // 创建并初始化 SSLContext
-    var sslContext = SSLContext.getInstance("TLS");
-    sslContext.init(null, trustManagerFactory.getTrustManagers(), null);
-
-    return sslContext;
   }
 }

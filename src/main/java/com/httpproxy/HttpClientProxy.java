@@ -9,13 +9,26 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class HttpClientProxy {
+  private static final Set<String> RESTRICTED_HEADERS =
+      Set.of(
+          "connection",
+          "content-length",
+          "expect",
+          "host",
+          "upgrade",
+          "transfer-encoding",
+          "proxy-authorization",
+          "proxy-connection",
+          "keep-alive",
+          "te",
+          "trailer");
   private static final HttpClient httpClient = HttpClient.newBuilder().build();
+  public static String schema = "http";
+  public static String targetHost = "127.0.0.1";
+  public static String targetPort = "80";
 
   public static HttpResponseRecord requestLocal(HttpRequestRecord httpRequestRecord) {
     try {
@@ -67,9 +80,16 @@ public class HttpClientProxy {
           throw new IllegalArgumentException(
               "Unsupported HTTP method: " + httpRequestRecord.method());
     }
-    builder.uri(URI.create(httpRequestRecord.path()));
+    String fullUrl =
+        String.format("%s://%s:%s%s", schema, targetHost, targetPort, httpRequestRecord.path());
+    System.out.printf(
+        "%s [DEBUG] Forwarding request to %s%n", LocalDateTime.now().format(formatter), fullUrl);
+    builder.uri(URI.create(fullUrl));
     for (var header : httpRequestRecord.headers().entrySet()) {
       for (String v : header.getValue()) {
+        if (RESTRICTED_HEADERS.contains(header.getKey().toLowerCase())) {
+          continue;
+        }
         builder.header(header.getKey(), v);
       }
     }

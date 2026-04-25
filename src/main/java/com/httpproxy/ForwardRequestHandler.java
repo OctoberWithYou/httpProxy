@@ -10,13 +10,12 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 /** 通用的请求处理器 (实现 HttpHandler 接口) */
-class ForwardRequestHandler implements HttpHandler {
+public class ForwardRequestHandler implements HttpHandler {
 
   ForwardRequestHandler() {}
 
@@ -32,16 +31,22 @@ class ForwardRequestHandler implements HttpHandler {
       SocketProtocol socketProtocols = Server.getSocketProtocols();
 
       byte[] request = HttpSerializer.serializeRequest(exchange);
-      socketProtocols.send(new Packet(request));
 
+      Packet packet = new Packet(request);
+      System.out.printf(
+          "%s [DEBUG] Sending request %s to server...%n",
+          LocalDateTime.now().format(formatter), packet);
+      socketProtocols.send(packet);
       var receive = socketProtocols.receive();
+      System.out.printf(
+          "%s [DEBUG] Received response %s from server%n",
+          LocalDateTime.now().format(formatter), receive);
       if (receive == null) {
         exchange.sendResponseHeaders(500, -1);
         return;
       }
 
       HttpResponseRecord response = HttpSerializer.deserializeResponse(receive.data());
-
 
       // 设置响应头
       if (response.headers() != null) {

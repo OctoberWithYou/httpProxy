@@ -1,5 +1,7 @@
 package com.httpproxy.util;
 
+import static com.httpproxy.util.Consistant.formatter;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.httpproxy.pojo.HttpRequestRecord;
@@ -8,6 +10,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,20 +37,36 @@ public class HttpSerializer {
 
     // 4. 转为 JSON 字符串并返回字节
     String json = GSON.toJson(message);
+
+    System.out.printf(
+        "%s [DEBUG] serialize request %s from server%n",
+        LocalDateTime.now().format(formatter), json);
+
     return json.getBytes(StandardCharsets.UTF_8);
   }
 
   /** 将字节数组反序列化为 HttpMessage 对象 */
   public static HttpRequestRecord deserializeRequest(byte[] data) {
-    return GSON.fromJson(new String(data, StandardCharsets.UTF_8), HttpRequestRecord.class);
+    String json = new String(data, StandardCharsets.UTF_8);
+    System.out.printf(
+        "%s [DEBUG] deserialize request %s from server%n",
+        LocalDateTime.now().format(formatter), json);
+    return GSON.fromJson(json, HttpRequestRecord.class);
   }
 
   public static byte[] serializeResponse(HttpResponseRecord httpResponseRecord) {
     String json = GSON.toJson(httpResponseRecord);
+    System.out.printf(
+        "%s [DEBUG] serialize response %s from server%n",
+        LocalDateTime.now().format(formatter), json);
     return json.getBytes(StandardCharsets.UTF_8);
   }
 
   public static HttpResponseRecord deserializeResponse(byte[] data) {
-    return GSON.fromJson(new String(data, StandardCharsets.UTF_8), HttpResponseRecord.class);
+    String json = new String(data, StandardCharsets.UTF_8);
+    System.out.printf(
+        "%s [DEBUG] deserialize response %s from server%n",
+        LocalDateTime.now().format(formatter), json);
+    return GSON.fromJson(json, HttpResponseRecord.class);
   }
 }

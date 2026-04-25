@@ -31,7 +31,7 @@ public class Server {
    *
    * <p>4. 生产环境建议使用CA签发的正式证书
    */
-  public static void main(String[] args) throws Exception {
+  public static void start() throws Exception {
     var port = 8443; // HTTPS默认端口
     var keystorePath = "keystore.jks"; // 密钥库文件路径
     var keystorePassword = "changeit"; // 密钥库密码
@@ -79,11 +79,18 @@ public class Server {
                     new SocketProtocol(
                         clientSocket.getInputStream(), clientSocket.getOutputStream());
 
+                Single.notifyHttpProxyStart();
+
               } catch (IOException e) {
                 System.out.printf(
                     "%s [WARN] Client Error %s%n",
                     LocalDateTime.now().format(formatter), e.getMessage());
                 e.printStackTrace();
+              } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+              } finally {
+                System.out.printf(
+                    "%s [INFO] Client disconnected%n", LocalDateTime.now().format(formatter));
               }
             });
       }

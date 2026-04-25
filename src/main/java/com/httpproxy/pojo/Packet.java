@@ -1,6 +1,7 @@
 package com.httpproxy.pojo;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * 数据包
@@ -12,6 +13,18 @@ import java.nio.ByteBuffer;
 public record Packet(long size, byte[] head, byte[] data) {
 
   public Packet(byte[] data) {
-    this(data.length + 8, ByteBuffer.allocate(8).putLong(data.length).array(), data);
+    this(data.length + 8, ByteBuffer.allocate(8).putLong(data.length + 8).array(), data);
+  }
+
+  @Override
+  public String toString() {
+    return "Packet{"
+        + "size="
+        + size
+        + ", head="
+        + Arrays.toString(head)
+        + ", data="
+        + Arrays.toString(data)
+        + '}';
   }
 }
