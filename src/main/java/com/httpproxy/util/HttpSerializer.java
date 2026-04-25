@@ -40,7 +40,7 @@ public class HttpSerializer {
 
     System.out.printf(
         "%s [DEBUG] serialize request %s from server%n",
-        LocalDateTime.now().format(formatter), json);
+        LocalDateTime.now().format(formatter), json.length());
 
     return json.getBytes(StandardCharsets.UTF_8);
   }
@@ -50,7 +50,7 @@ public class HttpSerializer {
     String json = new String(data, StandardCharsets.UTF_8);
     System.out.printf(
         "%s [DEBUG] deserialize request %s from server%n",
-        LocalDateTime.now().format(formatter), json);
+        LocalDateTime.now().format(formatter), json.length());
     return GSON.fromJson(json, HttpRequestRecord.class);
   }
 
@@ -58,7 +58,7 @@ public class HttpSerializer {
     String json = GSON.toJson(httpResponseRecord);
     System.out.printf(
         "%s [DEBUG] serialize response %s from server%n",
-        LocalDateTime.now().format(formatter), json);
+        LocalDateTime.now().format(formatter), json.length());
     return json.getBytes(StandardCharsets.UTF_8);
   }
 
@@ -66,7 +66,7 @@ public class HttpSerializer {
     String json = new String(data, StandardCharsets.UTF_8);
     System.out.printf(
         "%s [DEBUG] deserialize response %s from server%n",
-        LocalDateTime.now().format(formatter), json);
+        LocalDateTime.now().format(formatter), json.length());
     return GSON.fromJson(json, HttpResponseRecord.class);
   }
 }

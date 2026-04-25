@@ -13,9 +13,9 @@ import javax.net.ssl.SSLContext;
 
 public class HttpServerProxy {
 
-  private static final int HTTPS_PORT = 443;
   private static final String KEYSTORE_PATH = "keystore.jks";
   private static final String KEYSTORE_PASSWORD = "changeit";
+  public static int port = 443;
 
   public static void start() throws Exception {
     System.out.printf(
@@ -28,7 +28,7 @@ public class HttpServerProxy {
     ExecutorService threadPool = Executors.newCachedThreadPool();
 
     // 3. 启动 HTTPS 代理入口
-    var httpsServer = HttpsServer.create(new InetSocketAddress(HTTPS_PORT), 0);
+    var httpsServer = HttpsServer.create(new InetSocketAddress(port), 0);
     httpsServer.setHttpsConfigurator(
         new HttpsConfigurator(sslContext) {
           @Override
@@ -52,8 +52,7 @@ public class HttpServerProxy {
     httpsServer.start();
 
     System.out.printf(
-        "%s [INFO] HTTPS Proxy started on port %d%n",
-        LocalDateTime.now().format(formatter), HTTPS_PORT);
+        "%s [INFO] HTTPS Proxy started on port %d%n", LocalDateTime.now().format(formatter), port);
 
     // 可选：启动 HTTP 入口并重定向或同样处理
     // startHttpEntryPoint(HTTP_PORT, threadPool);

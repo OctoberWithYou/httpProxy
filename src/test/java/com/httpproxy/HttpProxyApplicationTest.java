@@ -18,7 +18,7 @@ class HttpProxyApplicationTest {
 
   @Test
   void testHttpsPort443() throws Exception {
-    String urlStr = "https://localhost:443";
+    String urlStr = "https://111.231.23.106:443";
 
     // 1. 创建无条件信任证书的 TrustManager (用于测试自签名证书)
     TrustManager[] trustAllCerts =

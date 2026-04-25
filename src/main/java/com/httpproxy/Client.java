@@ -8,6 +8,7 @@ import com.httpproxy.util.HttpSerializer;
 import com.httpproxy.util.SocketProtocol;
 import java.io.*;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.LocalDateTime;
 import javax.net.ssl.*;
@@ -30,9 +31,16 @@ public class Client {
    *
    * <p>3. 将 truststore.jks 放在项目根目录或 resources 目录
    */
-  public static void start() throws Exception {
-    var serverHost = "localhost";
-    var serverPort = 8443;
+  public static void start(String s) throws Exception {
+    String[] split = s.split(":");
+    String serverHost;
+    int serverPort = 8443;
+    if (split.length == 2) {
+      serverHost = split[0];
+      serverPort = Integer.parseInt(split[1]);
+    } else {
+      serverHost = s;
+    }
     var truststorePath = "truststore.jks";
     var truststorePassword = "changeit";
 
@@ -163,7 +171,7 @@ public class Client {
             }
           };
       SSLContext sc = SSLContext.getInstance("TLS");
-      sc.init(null, trustManagers, new java.security.SecureRandom());
+      sc.init(null, trustManagers, new SecureRandom());
       return sc;
     }
   }
