@@ -1,16 +1,15 @@
 package com.httpproxy;
 
-import static com.httpproxy.util.Consistant.formatter;
-
 import com.sun.net.httpserver.*;
 import java.io.FileInputStream;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
-import java.time.LocalDateTime;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.net.ssl.SSLContext;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class HttpServerProxy {
 
   private static final String KEYSTORE_PATH = "keystore.jks";
@@ -18,8 +17,7 @@ public class HttpServerProxy {
   public static int port = 443;
 
   public static void start() throws Exception {
-    System.out.printf(
-        "%s [INFO] Starting HttpServerProxy...%n", LocalDateTime.now().format(formatter));
+    log.info("Starting HttpServerProxy...");
 
     // 1. 初始化 SSLContext
     var sslContext = initSSLContext(KEYSTORE_PATH, KEYSTORE_PASSWORD);
@@ -51,8 +49,7 @@ public class HttpServerProxy {
     Single.waitTcpConnect();
     httpsServer.start();
 
-    System.out.printf(
-        "%s [INFO] HTTPS Proxy started on port %d%n", LocalDateTime.now().format(formatter), port);
+    log.info("HTTPS Proxy started on port {}", port);
 
     // 可选：启动 HTTP 入口并重定向或同样处理
     // startHttpEntryPoint(HTTP_PORT, threadPool);

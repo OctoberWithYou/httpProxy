@@ -1,16 +1,15 @@
 package com.httpproxy;
 
-import static com.httpproxy.util.Consistant.formatter;
-
 import com.httpproxy.pojo.HttpRequestRecord;
 import com.httpproxy.pojo.HttpResponseRecord;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.LocalDateTime;
 import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class HttpClientProxy {
   private static final Set<String> RESTRICTED_HEADERS =
       Set.of(
@@ -46,15 +45,12 @@ public class HttpClientProxy {
 
       return new HttpResponseRecord(
           response.statusCode(),
-          getReasonPhrase(response.statusCode()), // 或映射 reason phrase
+          getReasonPhrase(response.statusCode()),
           response.version().name(),
           responseHeaders,
           response.body());
     } catch (Exception e) {
-      System.err.printf(
-          "%s [ERROR] Local request forwarding failed: %s%n",
-          LocalDateTime.now().format(formatter), e.getMessage());
-      e.printStackTrace();
+      log.error("Local request forwarding failed: {}", e.getMessage(), e);
       return new HttpResponseRecord(500, "", "", new HashMap<>(), null);
     }
   }
@@ -82,8 +78,7 @@ public class HttpClientProxy {
     }
     String fullUrl =
         String.format("%s://%s:%s%s", schema, targetHost, targetPort, httpRequestRecord.path());
-    System.out.printf(
-        "%s [DEBUG] Forwarding request to %s%n", LocalDateTime.now().format(formatter), fullUrl);
+    log.debug("Forwarding request to {}", fullUrl);
     builder.uri(URI.create(fullUrl));
     for (var header : httpRequestRecord.headers().entrySet()) {
       for (String v : header.getValue()) {
@@ -93,6 +88,7 @@ public class HttpClientProxy {
         builder.header(header.getKey(), v);
       }
     }
+    //    builder.header("host", "ai-green.yasdb.com");
     return builder.build();
   }
 

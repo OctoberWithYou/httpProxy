@@ -1,16 +1,15 @@
 package com.httpproxy;
 
-import static com.httpproxy.util.Consistant.formatter;
-
 import com.httpproxy.util.SocketProtocol;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyStore;
-import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
 import javax.net.ssl.*;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class Server {
   private static SocketProtocol socketProtocols;
   public static int port = 8443;
@@ -43,8 +42,8 @@ public class Server {
     var sslServerSocketFactory = sslContext.getServerSocketFactory();
 
     // 创建并配置SSLServerSocket
-    try (var socketThreadPool = Executors.newSingleThreadExecutor();
-        var sslServerSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket()) {
+    var socketThreadPool = Executors.newSingleThreadExecutor();
+    try (var sslServerSocket = (SSLServerSocket) sslServerSocketFactory.createServerSocket()) {
 
       // 绑定端口
       sslServerSocket.bind(new InetSocketAddress(port));
@@ -55,8 +54,7 @@ public class Server {
       // 可选：只启用强加密套件
       // sslServerSocket.setEnabledCipherSuites(sslServerSocket.getSupportedCipherSuites());
 
-      System.out.printf(
-          "%s [INFO] SSL Server started on port %d%n", LocalDateTime.now().format(formatter), port);
+      log.info("SSL Server started on port {}", port);
 
       // 接受客户端连接
       while (true) {
@@ -71,9 +69,11 @@ public class Server {
                 String protocol = sslSession.getProtocol();
                 String cipherSuite = sslSession.getCipherSuite();
 
-                System.out.printf(
-                    "%s [INFO] Client connected from %s | Protocol: %s | Cipher: %s%n",
-                    LocalDateTime.now().format(formatter), clientIp, protocol, cipherSuite);
+                log.info(
+                    "Client connected from {} | Protocol: {} | Cipher: {}",
+                    clientIp,
+                    protocol,
+                    cipherSuite);
 
                 socketProtocols =
                     new SocketProtocol(
@@ -82,22 +82,19 @@ public class Server {
                 Single.notifyHttpProxyStart();
 
               } catch (IOException e) {
-                System.out.printf(
-                    "%s [WARN] Client Error %s%n",
-                    LocalDateTime.now().format(formatter), e.getMessage());
-                e.printStackTrace();
+                log.warn("Client Error {}", e.getMessage(), e);
               } catch (InterruptedException e) {
                 throw new RuntimeException(e);
               } finally {
-                System.out.printf(
-                    "%s [INFO] Client disconnected%n", LocalDateTime.now().format(formatter));
+                log.info("Client disconnected");
               }
             });
       }
     } catch (Throwable e) {
-      System.out.printf(
-          "%s [ERROR] Server Error %s%n", LocalDateTime.now().format(formatter), e.getMessage());
+      log.error("Server Error {}", e.getMessage(), e);
       throw e;
+    } finally {
+      socketThreadPool.shutdown();
     }
   }
 

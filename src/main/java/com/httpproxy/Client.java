@@ -1,7 +1,5 @@
 package com.httpproxy;
 
-import static com.httpproxy.util.Consistant.formatter;
-
 import com.httpproxy.pojo.HttpResponseRecord;
 import com.httpproxy.pojo.Packet;
 import com.httpproxy.util.HttpSerializer;
@@ -10,14 +8,15 @@ import java.io.*;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.time.LocalDateTime;
 import javax.net.ssl.*;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * SSL HTTPS 客户端（使用 SSLSocket）
  *
  * <p>特点： - 使用阻塞式 SSLSocket（简单易用） - 单向认证（只验证服务器证书） - SSL 加解密由 SSLSocket 自动处理
  */
+@Slf4j
 public class Client {
 
   /**
@@ -44,8 +43,7 @@ public class Client {
     var truststorePath = "truststore.jks";
     var truststorePassword = "changeit";
 
-    System.out.printf(
-        "%s [INFO] Starting SSL Client (SSLSocket mode)%n", LocalDateTime.now().format(formatter));
+    log.info("Starting SSL Client (SSLSocket mode)");
 
     // 初始化 SSLContext（单向认证）
     var sslContext = initSSLContext(truststorePath, truststorePassword);
@@ -53,9 +51,7 @@ public class Client {
     // 创建 SSLSocketFactory
     var sslSocketFactory = sslContext.getSocketFactory();
 
-    System.out.printf(
-        "%s [INFO] Connecting to %s:%d...%n",
-        LocalDateTime.now().format(formatter), serverHost, serverPort);
+    log.info("Connecting to {}:{}...", serverHost, serverPort);
 
     // 创建 SSLSocket 并连接
     try (var sslSocket = (SSLSocket) sslSocketFactory.createSocket(serverHost, serverPort)) {
@@ -63,65 +59,54 @@ public class Client {
       // 启动 SSL 握手
       sslSocket.startHandshake();
 
-      System.out.printf(
-          "%s [INFO] SSL Handshake completed successfully!%n",
-          LocalDateTime.now().format(formatter));
+      log.info("SSL Handshake completed successfully!");
 
       // 获取会话信息
       var sslSession = sslSocket.getSession();
-      System.out.printf(
-          "%s [INFO] Protocol: %s%n",
-          LocalDateTime.now().format(formatter), sslSession.getProtocol());
-      System.out.printf(
-          "%s [INFO] Cipher Suite: %s%n",
-          LocalDateTime.now().format(formatter), sslSession.getCipherSuite());
-      System.out.printf(
-          "%s [INFO] Server Principal: %s%n",
-          LocalDateTime.now().format(formatter), sslSession.getPeerPrincipal());
+      log.info("Protocol: {}", sslSession.getProtocol());
+      log.info("Cipher Suite: {}", sslSession.getCipherSuite());
+      log.info("Server Principal: {}", sslSession.getPeerPrincipal());
 
       // 发送和接收数据
       SocketProtocol socketProtocol =
           new SocketProtocol(sslSocket.getInputStream(), sslSocket.getOutputStream());
 
       while (true) {
-        Packet receive = socketProtocol.receive();
-        System.out.printf(
-            "%s [DEBUG] Received response %s from server%n",
-            LocalDateTime.now().format(formatter), receive);
-        if (receive == null) {
-          continue;
+        socketProtocol.lock();
+        try {
+          Packet receive = socketProtocol.receive();
+          if (receive == null) {
+            continue;
+          }
+          log.debug("Received request {} from server", receive);
+
+          var request = HttpSerializer.deserializeRequest(receive.data());
+          HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
+
+          byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
+
+          Packet packet = new Packet(response);
+          log.debug("Sending response {} to server...", packet);
+          socketProtocol.send(packet);
+        } finally {
+          socketProtocol.unlock();
         }
-
-        var request = HttpSerializer.deserializeRequest(receive.data());
-        HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
-
-        byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
-
-        Packet packet = new Packet(response);
-        System.out.printf(
-            "%s [DEBUG] Sending response %s to server...%n",
-            LocalDateTime.now().format(formatter), packet);
-        socketProtocol.send(packet);
       }
 
     } catch (SSLHandshakeException e) {
-      System.out.printf(
-          "%s [ERROR] SSL Handshake Failed: %s%n",
-          LocalDateTime.now().format(formatter), e.getMessage());
-      System.out.println("\n可能的原因：");
-      System.out.println("1. 服务器证书未导入信任库");
-      System.out.println("2. 证书已过期或域名不匹配");
-      System.out.println("\n解决方案：");
-      System.out.println("- 确保证书已正确导入 truststore.jks");
-      System.out.println("- 检查证书有效期和 CN/SAN 配置");
+      log.error("SSL Handshake Failed: {}", e.getMessage());
+      log.info("\n可能的原因：");
+      log.info("1. 服务器证书未导入信任库");
+      log.info("2. 证书已过期或域名不匹配");
+      log.info("\n解决方案：");
+      log.info("- 确保证书已正确导入 truststore.jks");
+      log.info("- 检查证书有效期和 CN/SAN 配置");
       throw e;
     } catch (IOException e) {
-      System.out.printf(
-          "%s [ERROR] Connection Error: %s%n",
-          LocalDateTime.now().format(formatter), e.getMessage());
+      log.error("Connection Error: {}", e.getMessage(), e);
       throw e;
     } finally {
-      System.out.printf("%s [INFO] Connection closed.%n", LocalDateTime.now().format(formatter));
+      log.info("Connection closed.");
     }
   }
 
