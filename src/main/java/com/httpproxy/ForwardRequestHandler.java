@@ -52,7 +52,7 @@ public class ForwardRequestHandler implements HttpHandler {
                 log.error("Error receiving packet: {}", e.getMessage());
                 throw new RuntimeException(e);
               }
-            })
+            }, "receive-packet")
         .start();
     new Thread(
             () -> {
@@ -70,9 +70,10 @@ public class ForwardRequestHandler implements HttpHandler {
                   lock.unlock();
                 }
               } catch (InterruptedException e) {
+                log.error("Error receiving packet: {}", e.getMessage());
                 throw new RuntimeException(e);
               }
-            })
+            }, "httpxProxy-receive-apply")
         .start();
   }
 
