@@ -7,7 +7,6 @@ import com.httpproxy.util.SocketProtocol;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -17,21 +16,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
-
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * 通用的请求处理器 (实现 HttpHandler 接口)
- */
+/** 通用的请求处理器 (实现 HttpHandler 接口) */
 @Slf4j
 public class ForwardRequestHandler implements HttpHandler {
   private static final AtomicLong sessionIds = new AtomicLong(0);
   private static final LinkedBlockingQueue<Packet> packets = new LinkedBlockingQueue<>();
   private static final Map<Long, Function<Packet, Void>> tasks = new ConcurrentHashMap<>();
 
-  /**
-   * Hop-by-hop 头，不应被代理转发
-   */
+  /** Hop-by-hop 头，不应被代理转发 */
   private static final Set<String> HOP_BY_HOP_HEADERS =
       Set.of(
           "connection",
@@ -48,56 +42,56 @@ public class ForwardRequestHandler implements HttpHandler {
   ForwardRequestHandler() {
     socketProtocols = Server.getSocketProtocols();
     new Thread(
-        () -> {
-          try {
-            while (true) {
-              final Packet receive = socketProtocols.receive();
-              packets.put(receive);
-            }
-          } catch (IOException | InterruptedException e) {
-            log.error("Error receiving packet: {}", e.getMessage());
-            throw new RuntimeException(e);
-          }
-        }, "receive-packet")
+            () -> {
+              try {
+                while (true) {
+                  final Packet receive = socketProtocols.receive();
+                  packets.put(receive);
+                }
+              } catch (IOException | InterruptedException e) {
+                log.error("Error receiving packet: {}", e.getMessage());
+                throw new RuntimeException(e);
+              }
+            },
+            "receive-packet")
         .start();
     new Thread(
-        () -> {
-          try {
-            while (true) {
-              final Packet take = packets.take();
-              final Function<Packet, Void> runnable;
-                runnable = tasks.get(take.sessionId());
-              if (runnable != null) {
-                runnable.apply(take);
-              } else {
-                log.warn("No task found for sessionId: {}", take.sessionId());
+            () -> {
+              try {
+                while (true) {
+                  final Packet take = packets.take();
+                  final Function<Packet, Void> runnable;
+                  runnable = tasks.get(take.sessionId());
+                  if (runnable != null) {
+                    runnable.apply(take);
+                  } else {
+                    log.warn("No task found for sessionId: {}", take.sessionId());
+                  }
+                }
+              } catch (InterruptedException e) {
+                log.error("Error receiving packet: {}", e.getMessage());
+                throw new RuntimeException(e);
               }
-            }
-          } catch (InterruptedException e) {
-            log.error("Error receiving packet: {}", e.getMessage());
-            throw new RuntimeException(e);
-          }
-        }, "httpxProxy-receive-apply")
+            },
+            "httpxProxy-receive-apply")
         .start();
   }
 
   @Override
   public void handle(HttpExchange exchange) throws IOException {
-      final long sessionId = sessionIds.getAndIncrement();
-      String requestMethod = exchange.getRequestMethod();
-      String path = exchange.getRequestURI().getPath();
-      log.info(
-          "Received {} request for {} from {}", requestMethod, path, exchange.getRemoteAddress());
+    final long sessionId = sessionIds.getAndIncrement();
+    String requestMethod = exchange.getRequestMethod();
+    String path = exchange.getRequestURI().getPath();
+    log.info(
+        "Received {} request for {} from {}", requestMethod, path, exchange.getRemoteAddress());
 
-      byte[] request = HttpSerializer.serializeRequest(exchange);
+    byte[] request = HttpSerializer.serializeRequest(exchange);
 
-      Packet packet = new Packet(sessionId, request);
-      log.trace("Sending request data: {}", new String(request, StandardCharsets.UTF_8));
-      socketProtocols.send(packet);
+    Packet packet = new Packet(sessionId, request);
+    log.trace("Sending request data: {}", new String(request, StandardCharsets.UTF_8));
+    socketProtocols.send(packet);
 
-      tasks.put(
-          sessionId,
-          receiveCallback(exchange));
+    tasks.put(sessionId, receiveCallback(exchange));
   }
 
   private Function<Packet, Void> receiveCallback(final HttpExchange exchange) {

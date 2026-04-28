@@ -35,10 +35,7 @@ public record HttpResponseRecord(
 
   /** SSE 流开始 */
   public static HttpResponseRecord sseStart(
-      int statusCode,
-      String reasonPhrase,
-      String protocol,
-      Map<String, List<String>> headers) {
+      int statusCode, String reasonPhrase, String protocol, Map<String, List<String>> headers) {
     return new HttpResponseRecord(statusCode, reasonPhrase, protocol, headers, null, true, false);
   }
 
