@@ -27,7 +27,7 @@ public class HttpSerializer {
         new HttpRequestRecord(
             exchange.getRequestMethod(),
             exchange.getRequestURI().toString(),
-            "HTTP/1.1",
+            exchange.getProtocol(),
             new HashMap<>(requestHeaders),
             body);
 
@@ -42,19 +42,53 @@ public class HttpSerializer {
   /** 将字节数组反序列化为 HttpMessage 对象 */
   public static HttpRequestRecord deserializeRequest(byte[] data) {
     String json = new String(data, StandardCharsets.UTF_8);
-    log.debug("deserialize request {} from server", json.length());
-    return GSON.fromJson(json, HttpRequestRecord.class);
+    log.debug("deserialize request length={} from server", json.length());
+    HttpRequestRecord record = GSON.fromJson(json, HttpRequestRecord.class);
+    log.debug(
+        "deserialize request: method={}, path={}, headers={}, bodyLen={}",
+        record.method(),
+        record.path(),
+        record.headers(),
+        record.body() != null ? record.body().length : 0);
+    return record;
   }
 
   public static byte[] serializeResponse(HttpResponseRecord httpResponseRecord) {
     String json = GSON.toJson(httpResponseRecord);
-    log.debug("serialize response {} from server", json.length());
+    log.debug("serialize response length={} from server", json.length());
+    log.debug(
+        "serialize response: statusCode={}, reasonPhrase={}, protocol={}, isSse={}, isSseEnd={}, headers={}, bodyLen={}",
+        httpResponseRecord.statusCode(),
+        httpResponseRecord.reasonPhrase(),
+        httpResponseRecord.protocol(),
+        httpResponseRecord.isSse(),
+        httpResponseRecord.isSseEnd(),
+        httpResponseRecord.headers(),
+        httpResponseRecord.body() != null ? httpResponseRecord.body().length : 0);
     return json.getBytes(StandardCharsets.UTF_8);
   }
 
   public static HttpResponseRecord deserializeResponse(byte[] data) {
     String json = new String(data, StandardCharsets.UTF_8);
-    log.debug("deserialize response {} from server", json.length());
-    return GSON.fromJson(json, HttpResponseRecord.class);
+    log.debug("deserialize response length={} from server", json.length());
+    HttpResponseRecord record = GSON.fromJson(json, HttpResponseRecord.class);
+    log.debug(
+        "deserialize response: statusCode={}, reasonPhrase={}, protocol={}, isSse={}, isSseEnd={}, headers={}, bodyLen={}",
+        record.statusCode(),
+        record.reasonPhrase(),
+        record.protocol(),
+        record.isSse(),
+        record.isSseEnd(),
+        record.headers(),
+        record.body() != null ? record.body().length : 0);
+    if (record.headers() != null) {
+      log.debug("deserialize response headers detail: {}", record.headers());
+    }
+    if (record.body() != null && record.body().length < 500) {
+      log.debug(
+          "deserialize response body content: {}",
+          new String(record.body(), StandardCharsets.UTF_8));
+    }
+    return record;
   }
 }

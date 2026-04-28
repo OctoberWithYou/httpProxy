@@ -34,11 +34,25 @@ public class HttpClientProxy {
   public static void requestLocal(
       HttpRequestRecord httpRequestRecord, Function<HttpResponseRecord, Void> callback) {
     try {
+      log.debug(
+          "requestLocal: method={}, path={}, headers={}, bodyLen={}",
+          httpRequestRecord.method(),
+          httpRequestRecord.path(),
+          httpRequestRecord.headers(),
+          httpRequestRecord.body() != null ? httpRequestRecord.body().length : 0);
+
       HttpRequest request = prepareRequest(httpRequestRecord);
+      log.debug(
+          "requestLocal: prepared request uri={}, method={}", request.uri(), request.method());
 
       // 同步请求
+      log.debug("requestLocal: sending request...");
       HttpResponse<InputStream> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+      log.debug(
+          "requestLocal: received response statusCode={}, version={}",
+          response.statusCode(),
+          response.version());
 
       Map<String, List<String>> responseHeaders = new HashMap<>();
       response
@@ -46,14 +60,19 @@ public class HttpClientProxy {
           .map()
           .forEach((name, values) -> responseHeaders.put(name, new ArrayList<>(values)));
 
-      // 检测是否为 SSE 响应
+      log.debug("requestLocal: response headers={}", responseHeaders);
+
+      // 检测是否为 SSE 响应（case-insensitive）
       boolean isSse =
-          responseHeaders.containsKey("Content-Type")
-              && responseHeaders.get("Content-Type").stream()
-                  .anyMatch(v -> v.contains("text/event-stream"));
+          responseHeaders.entrySet().stream()
+              .filter(e -> e.getKey().equalsIgnoreCase("Content-Type"))
+              .anyMatch(e -> e.getValue().stream().anyMatch(v -> v.contains("text/event-stream")));
+
+      log.debug("requestLocal: isSse={}", isSse);
 
       if (isSse) {
         // SSE 流开始
+        log.debug("requestLocal: SSE stream start, calling callback with sseStart");
         callback.apply(
             HttpResponseRecord.sseStart(
                 response.statusCode(),
@@ -65,17 +84,30 @@ public class HttpClientProxy {
         try (InputStream inputStream = response.body()) {
           byte[] buffer = new byte[1024];
           int bytesRead;
+          int totalBytes = 0;
           while ((bytesRead = inputStream.read(buffer)) != -1) {
             byte[] chunk = Arrays.copyOf(buffer, bytesRead);
+            totalBytes += bytesRead;
+            log.debug("requestLocal: SSE event bytesRead={}, totalBytes={}", bytesRead, totalBytes);
             callback.apply(HttpResponseRecord.sseEvent(chunk));
           }
+          log.debug("requestLocal: SSE stream finished, totalBytes={}", totalBytes);
         }
 
         // SSE 流结束
+        log.debug("requestLocal: SSE stream end, calling callback with sseEnd");
         callback.apply(HttpResponseRecord.sseEnd());
       } else {
-        // 普通响应
+        // 通响应
+        log.debug("requestLocal: normal response, reading body...");
         byte[] body = response.body().readAllBytes();
+        log.debug("requestLocal: normal response bodyLen={}", body.length);
+        if (body.length < 500) {
+          log.debug(
+              "requestLocal: normal response body content: {}",
+              new String(body, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        log.debug("requestLocal: normal response, calling callback");
         callback.apply(
             HttpResponseRecord.normal(
                 response.statusCode(),
@@ -83,6 +115,7 @@ public class HttpClientProxy {
                 response.version().name(),
                 responseHeaders,
                 body));
+        log.debug("requestLocal: callback completed");
       }
     } catch (Exception e) {
       log.error("Local request forwarding failed: {}", e.getMessage(), e);

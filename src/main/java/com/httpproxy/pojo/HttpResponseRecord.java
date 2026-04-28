@@ -41,11 +41,11 @@ public record HttpResponseRecord(
 
   /** SSE 事件 */
   public static HttpResponseRecord sseEvent(byte[] body) {
-    return new HttpResponseRecord(200, "OK", "HTTP/1.1", null, body, true, false);
+    return new HttpResponseRecord(0, null, null, null, body, true, false);
   }
 
   /** SSE 流结束 */
   public static HttpResponseRecord sseEnd() {
-    return new HttpResponseRecord(200, "OK", "HTTP/1.1", null, null, true, true);
+    return new HttpResponseRecord(0, null, null, null, null, true, true);
   }
 }

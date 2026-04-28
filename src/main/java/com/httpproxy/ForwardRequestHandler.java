@@ -37,6 +37,11 @@ public class ForwardRequestHandler implements HttpHandler {
           "transfer-encoding",
           "upgrade");
 
+  /** HTTP/2 伪头部，以冒号开头，不应转发给 HTTP/1.1 客户端 */
+  private static boolean isHttp2PseudoHeader(String headerName) {
+    return headerName.startsWith(":");
+  }
+
   private SocketProtocol socketProtocols;
 
   ForwardRequestHandler() {}
@@ -100,10 +105,14 @@ public class ForwardRequestHandler implements HttpHandler {
   private Function<Packet, Void> receiveCallback(final HttpExchange exchange) {
     return receive -> {
       try {
+        log.debug(
+            "receiveCallback triggered for sessionId={}",
+            receive != null ? receive.sessionId() : "null");
         log.trace(
             "Received response data: {}",
             receive != null ? new String(receive.data(), StandardCharsets.UTF_8) : "null");
         if (receive == null) {
+          log.warn("receive is null, sending 500 error");
           exchange.sendResponseHeaders(500, -1);
           exchange.close();
           return null;
@@ -111,43 +120,74 @@ public class ForwardRequestHandler implements HttpHandler {
 
         HttpResponseRecord response = HttpSerializer.deserializeResponse(receive.data());
 
+        log.debug(
+            "Processing response: isSse={}, isSseEnd={}, statusCode={}, hasHeaders={}, hasBody={}",
+            response.isSse(),
+            response.isSseEnd(),
+            response.statusCode(),
+            response.headers() != null,
+            response.body() != null);
+
         if (response.isSse()) {
           // SSE 流式响应
           if (!response.isSseEnd() && response.headers() != null) {
             // SSE 流开始 - 发送响应头
+            log.debug("SSE stream start: setting headers");
             Headers responseHeaders = exchange.getResponseHeaders();
             for (Map.Entry<String, List<String>> entry : response.headers().entrySet()) {
               String headerName = entry.getKey().toLowerCase();
               if (HOP_BY_HOP_HEADERS.contains(headerName)) {
+                log.debug("Skipping hop-by-hop header: {}", headerName);
+                continue;
+              }
+              if (isHttp2PseudoHeader(headerName)) {
+                log.debug("Skipping HTTP/2 pseudo header: {}", headerName);
                 continue;
               }
               for (String value : entry.getValue()) {
                 responseHeaders.add(entry.getKey(), value);
+                log.debug("Adding header: {}={}", entry.getKey(), value);
               }
             }
+            log.debug(
+                "SSE stream start: sending response headers with statusCode={}, contentLength=0 (chunked)",
+                response.statusCode());
             exchange.sendResponseHeaders(response.statusCode(), 0); // chunked 模式
+            log.debug("SSE stream start: headers sent successfully");
           } else if (!response.isSseEnd() && response.body() != null) {
             // SSE 事件 - 写入响应体
+            log.debug("SSE event: writing body length={}", response.body().length);
             exchange.getResponseBody().write(response.body());
             exchange.getResponseBody().flush();
+            log.debug("SSE event: body written and flushed");
           } else if (response.isSseEnd()) {
             // SSE 流结束 - 关闭连接
+            log.debug("SSE stream end: closing exchange for sessionId={}", receive.sessionId());
             exchange.close();
             tasks.remove(receive.sessionId());
+            log.debug("SSE stream end: task removed for sessionId={}", receive.sessionId());
             return null;
           }
           // SSE 流未结束，继续等待下一个包
+          log.debug("SSE stream continuing, waiting for next packet");
         } else {
           // 普通响应
+          log.debug("Normal response: processing");
           if (response.headers() != null) {
             Headers responseHeaders = exchange.getResponseHeaders();
             for (Map.Entry<String, List<String>> entry : response.headers().entrySet()) {
               String headerName = entry.getKey().toLowerCase();
               if (HOP_BY_HOP_HEADERS.contains(headerName)) {
+                log.debug("Skipping hop-by-hop header: {}", headerName);
+                continue;
+              }
+              if (isHttp2PseudoHeader(headerName)) {
+                log.debug("Skipping HTTP/2 pseudo header: {}", headerName);
                 continue;
               }
               for (String value : entry.getValue()) {
                 responseHeaders.add(entry.getKey(), value);
+                log.debug("Adding header: {}={}", entry.getKey(), value);
               }
             }
           }
@@ -155,17 +195,44 @@ public class ForwardRequestHandler implements HttpHandler {
           byte[] responseBody = response.body();
           int contentLength = responseBody == null ? 0 : responseBody.length;
 
+          log.debug(
+              "Normal response: statusCode={}, contentLength={}, hasBody={}",
+              response.statusCode(),
+              contentLength,
+              responseBody != null);
+
+          log.debug(
+              "Normal response: exchange response headers before send: {}",
+              exchange.getResponseHeaders());
+
           exchange.sendResponseHeaders(response.statusCode(), contentLength);
+          log.debug("Normal response: headers sent");
 
           if (responseBody != null) {
             exchange.getResponseBody().write(responseBody);
+            log.debug("Normal response: body written length={}", responseBody.length);
           }
           exchange.close();
+          log.debug("Normal response: exchange closed for sessionId={}", receive.sessionId());
+          tasks.remove(receive.sessionId());
+          log.debug("Normal response: task removed for sessionId={}", receive.sessionId());
           return null;
         }
         return null;
       } catch (Throwable e) {
-        log.error("Error handling request: {}", e.getMessage());
+        log.error(
+            "Error handling request: sessionId={}, error={}",
+            receive != null ? receive.sessionId() : "null",
+            e.getMessage(),
+            e);
+        try {
+          exchange.close();
+          if (receive != null) {
+            tasks.remove(receive.sessionId());
+          }
+        } catch (Exception ex) {
+          log.error("Error closing exchange: {}", ex.getMessage());
+        }
         return null;
       }
     };
