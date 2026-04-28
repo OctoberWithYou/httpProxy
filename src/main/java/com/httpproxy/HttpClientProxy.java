@@ -2,11 +2,14 @@ package com.httpproxy;
 
 import com.httpproxy.pojo.HttpRequestRecord;
 import com.httpproxy.pojo.HttpResponseRecord;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.*;
+import java.util.function.Function;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -29,26 +32,55 @@ public class HttpClientProxy {
   public static String targetHost = "127.0.0.1";
   public static String targetPort = "80";
 
-  public static HttpResponseRecord requestLocal(HttpRequestRecord httpRequestRecord) {
+  public static void requestLocal(HttpRequestRecord httpRequestRecord, Function<HttpResponseRecord, Void> callback) {
     try {
-      HttpResponse<byte[]> response =
-          httpClient.send(
-              prepareRequest(httpRequestRecord), HttpResponse.BodyHandlers.ofByteArray());
+      HttpRequest request = prepareRequest(httpRequestRecord);
+
+      // 同步请求
+      HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
       Map<String, List<String>> responseHeaders = new HashMap<>();
-      response
-          .headers()
-          .map()
+      response.headers().map()
           .forEach((name, values) -> responseHeaders.put(name, new ArrayList<>(values)));
 
-      return new HttpResponseRecord(
-          response.statusCode(),
-          getReasonPhrase(response.statusCode()),
-          response.version().name(),
-          responseHeaders,
-          response.body());
+      // 检测是否为 SSE 响应
+      boolean isSse = responseHeaders.containsKey("Content-Type")
+          && responseHeaders.get("Content-Type").stream()
+              .anyMatch(v -> v.contains("text/event-stream"));
+
+      if (isSse) {
+        // SSE 流开始
+        callback.apply(HttpResponseRecord.sseStart(
+            response.statusCode(),
+            getReasonPhrase(response.statusCode()),
+            response.version().name(),
+            responseHeaders));
+
+        // 读取 SSE 流 - 直接透传
+        try (InputStream inputStream = response.body()) {
+          byte[] buffer = new byte[1024];
+          int bytesRead;
+          while ((bytesRead = inputStream.read(buffer)) != -1) {
+            byte[] chunk = Arrays.copyOf(buffer, bytesRead);
+            callback.apply(HttpResponseRecord.sseEvent(chunk));
+          }
+        }
+
+        // SSE 流结束
+        callback.apply(HttpResponseRecord.sseEnd());
+      } else {
+        // 普通响应
+        byte[] body = response.body().readAllBytes();
+        callback.apply(HttpResponseRecord.normal(
+            response.statusCode(),
+            getReasonPhrase(response.statusCode()),
+            response.version().name(),
+            responseHeaders,
+            body));
+      }
     } catch (Exception e) {
       log.error("Local request forwarding failed: {}", e.getMessage(), e);
-      return new HttpResponseRecord(500, "", "", new HashMap<>(), null);
+      callback.apply(HttpResponseRecord.normal(500, "", "", new HashMap<>(), null));
     }
   }
 

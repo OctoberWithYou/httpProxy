@@ -8,6 +8,9 @@ import java.io.*;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
 import javax.net.ssl.*;
 import lombok.extern.slf4j.Slf4j;
 
@@ -71,6 +74,8 @@ public class Client {
       SocketProtocol socketProtocol =
           new SocketProtocol(sslSocket.getInputStream(), sslSocket.getOutputStream());
 
+      final ExecutorService service = Executors.newCachedThreadPool();
+
       while (true) {
         Packet receive = socketProtocol.receive();
         if (receive == null) {
@@ -78,14 +83,24 @@ public class Client {
         }
         log.debug("Received request {} from server", receive);
 
-        var request = HttpSerializer.deserializeRequest(receive.data());
-        HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
+        service.submit(() -> {
+          var request = HttpSerializer.deserializeRequest(receive.data());
+          HttpClientProxy.requestLocal(request, httpResponseRecord -> {
 
-        byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
+            byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
 
-        Packet packet = new Packet(receive.sessionId(), response);
-        log.debug("Sending response {} to server...", packet);
-        socketProtocol.send(packet);
+            Packet packet = new Packet(receive.sessionId(), response);
+            log.debug("Sending response {} to server...", packet);
+            try {
+              socketProtocol.send(packet);
+            } catch (IOException e) {
+              log.error("Error sending response to server: {}", e.getMessage());
+              throw new RuntimeException(e);
+            }
+            return null;
+          });
+
+        });
       }
 
     } catch (SSLHandshakeException e) {

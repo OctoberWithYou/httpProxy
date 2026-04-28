@@ -96,50 +96,7 @@ public class ForwardRequestHandler implements HttpHandler {
       try {
         tasks.put(
             sessionId,
-            receive -> {
-              try {
-                log.trace(
-                    "Received response data: {}",
-                    receive != null ? new String(receive.data(), StandardCharsets.UTF_8) : "null");
-                if (receive == null) {
-                  exchange.sendResponseHeaders(500, -1);
-                  return null;
-                }
-
-                HttpResponseRecord response = HttpSerializer.deserializeResponse(receive.data());
-
-                // 设置响应头（过滤 hop-by-hop 头）
-                if (response.headers() != null) {
-                  Headers responseHeaders = exchange.getResponseHeaders();
-                  for (Map.Entry<String, List<String>> entry : response.headers().entrySet()) {
-                    String headerName = entry.getKey().toLowerCase();
-                    if (HOP_BY_HOP_HEADERS.contains(headerName)) {
-                      continue;
-                    }
-                    for (String value : entry.getValue()) {
-                      responseHeaders.add(entry.getKey(), value);
-                    }
-                  }
-                }
-
-                // 获取响应体
-                byte[] responseBody = response.body();
-                int contentLength = responseBody == null ? 0 : responseBody.length;
-
-                // 发送响应头
-                exchange.sendResponseHeaders(response.statusCode(), contentLength);
-
-                // 发送响应体
-                if (responseBody != null) {
-                  exchange.getResponseBody().write(responseBody);
-                }
-                return null;
-              } catch (IOException e) {
-                throw new RuntimeException(e);
-              } finally {
-                exchange.close();
-              }
-            });
+            receiveCallback(exchange));
       } finally {
         lock.unlock();
       }
@@ -148,5 +105,52 @@ public class ForwardRequestHandler implements HttpHandler {
       // 关闭交换 (JDK 17 建议显式关闭)
       exchange.close();
     }
+  }
+
+  private Function<Packet, Void> receiveCallback(final HttpExchange exchange) {
+    return receive -> {
+      try {
+        log.trace(
+            "Received response data: {}",
+            receive != null ? new String(receive.data(), StandardCharsets.UTF_8) : "null");
+        if (receive == null) {
+          exchange.sendResponseHeaders(500, -1);
+          return null;
+        }
+
+        HttpResponseRecord response = HttpSerializer.deserializeResponse(receive.data());
+
+        // 设置响应头（过滤 hop-by-hop 头）
+        if (response.headers() != null) {
+          Headers responseHeaders = exchange.getResponseHeaders();
+          for (Map.Entry<String, List<String>> entry : response.headers().entrySet()) {
+            String headerName = entry.getKey().toLowerCase();
+            if (HOP_BY_HOP_HEADERS.contains(headerName)) {
+              continue;
+            }
+            for (String value : entry.getValue()) {
+              responseHeaders.add(entry.getKey(), value);
+            }
+          }
+        }
+
+        // 获取响应体
+        byte[] responseBody = response.body();
+        int contentLength = responseBody == null ? 0 : responseBody.length;
+
+        // 发送响应头
+        exchange.sendResponseHeaders(response.statusCode(), contentLength);
+
+        // 发送响应体
+        if (responseBody != null) {
+          exchange.getResponseBody().write(responseBody);
+        }
+        return null;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      } finally {
+        exchange.close();
+      }
+    };
   }
 }
