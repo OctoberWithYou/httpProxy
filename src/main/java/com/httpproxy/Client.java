@@ -72,25 +72,20 @@ public class Client {
           new SocketProtocol(sslSocket.getInputStream(), sslSocket.getOutputStream());
 
       while (true) {
-        socketProtocol.lock();
-        try {
-          Packet receive = socketProtocol.receive();
-          if (receive == null) {
-            continue;
-          }
-          log.debug("Received request {} from server", receive);
-
-          var request = HttpSerializer.deserializeRequest(receive.data());
-          HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
-
-          byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
-
-          Packet packet = new Packet(response);
-          log.debug("Sending response {} to server...", packet);
-          socketProtocol.send(packet);
-        } finally {
-          socketProtocol.unlock();
+        Packet receive = socketProtocol.receive();
+        if (receive == null) {
+          continue;
         }
+        log.debug("Received request {} from server", receive);
+
+        var request = HttpSerializer.deserializeRequest(receive.data());
+        HttpResponseRecord httpResponseRecord = HttpClientProxy.requestLocal(request);
+
+        byte[] response = HttpSerializer.serializeResponse(httpResponseRecord);
+
+        Packet packet = new Packet(receive.sessionId(), response);
+        log.debug("Sending response {} to server...", packet);
+        socketProtocol.send(packet);
       }
 
     } catch (SSLHandshakeException e) {

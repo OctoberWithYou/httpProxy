@@ -38,10 +38,7 @@ public class HttpClientProxy {
       response
           .headers()
           .map()
-          .forEach(
-              (name, values) -> {
-                responseHeaders.put(name, new ArrayList<>(values));
-              });
+          .forEach((name, values) -> responseHeaders.put(name, new ArrayList<>(values)));
 
       return new HttpResponseRecord(
           response.statusCode(),
@@ -88,7 +85,6 @@ public class HttpClientProxy {
         builder.header(header.getKey(), v);
       }
     }
-    //    builder.header("host", "ai-green.yasdb.com");
     return builder.build();
   }
 
