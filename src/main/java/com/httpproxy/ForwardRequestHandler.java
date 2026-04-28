@@ -37,9 +37,11 @@ public class ForwardRequestHandler implements HttpHandler {
           "transfer-encoding",
           "upgrade");
 
-  private final SocketProtocol socketProtocols;
+  private SocketProtocol socketProtocols;
 
-  ForwardRequestHandler() {
+  ForwardRequestHandler() {}
+
+  public SocketProtocol startReceive() {
     socketProtocols = Server.getSocketProtocols();
     new Thread(
             () -> {
@@ -75,6 +77,7 @@ public class ForwardRequestHandler implements HttpHandler {
             },
             "httpxProxy-receive-apply")
         .start();
+    return socketProtocols;
   }
 
   @Override
