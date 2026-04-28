@@ -4,6 +4,7 @@ import com.httpproxy.util.SocketProtocol;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.security.KeyStore;
 import java.util.concurrent.Executors;
 import javax.net.ssl.*;
@@ -13,6 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 public class Server {
   private static SocketProtocol socketProtocols;
   public static int port = 8443;
+
+  /** 心跳间隔（毫秒） */
+  private static final int HEARTBEAT_INTERVAL = 30000;
 
   /**
    * SSL HTTPS代理服务器
@@ -60,6 +64,10 @@ public class Server {
       while (true) {
         var clientSocket = sslServerSocket.accept();
 
+        // 启用 TCP Keep-Alive
+        clientSocket.setKeepAlive(true);
+        log.debug("TCP Keep-Alive enabled for client");
+
         socketThreadPool.submit(
             () -> {
               try (clientSocket) {
@@ -79,6 +87,9 @@ public class Server {
                     new SocketProtocol(
                         clientSocket.getInputStream(), clientSocket.getOutputStream());
 
+                // 启动心跳线程
+                startHeartbeatThread(socketProtocols, clientIp);
+
                 Single.notifyHttpProxyStart();
 
               } catch (IOException e) {
@@ -96,6 +107,28 @@ public class Server {
     } finally {
       socketThreadPool.shutdown();
     }
+  }
+
+  /** 启动心跳发送线程 */
+  private static void startHeartbeatThread(SocketProtocol protocol, String clientIp) {
+    Thread heartbeatThread =
+        new Thread(
+            () -> {
+              try {
+                while (true) {
+                  Thread.sleep(HEARTBEAT_INTERVAL);
+                  protocol.sendHeartbeat();
+                  log.debug("Heartbeat sent to {}", clientIp);
+                }
+              } catch (InterruptedException e) {
+                log.debug("Heartbeat thread interrupted for {}", clientIp);
+              } catch (IOException e) {
+                log.warn("Heartbeat failed for {}: {}", clientIp, e.getMessage());
+              }
+            },
+            "heartbeat-" + clientIp);
+    heartbeatThread.setDaemon(true);
+    heartbeatThread.start();
   }
 
   /**

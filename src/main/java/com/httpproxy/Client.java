@@ -20,6 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class Client {
 
+  /** 心跳间隔（毫秒） */
+  private static final int HEARTBEAT_INTERVAL = 30000;
+
   /**
    * 自签名证书使用说明：
    *
@@ -57,6 +60,10 @@ public class Client {
     // 创建 SSLSocket 并连接
     try (var sslSocket = (SSLSocket) sslSocketFactory.createSocket(serverHost, serverPort)) {
 
+      // 启用 TCP Keep-Alive
+      sslSocket.setKeepAlive(true);
+      log.debug("TCP Keep-Alive enabled");
+
       // 启动 SSL 握手
       sslSocket.startHandshake();
 
@@ -71,6 +78,9 @@ public class Client {
       // 发送和接收数据
       SocketProtocol socketProtocol =
           new SocketProtocol(sslSocket.getInputStream(), sslSocket.getOutputStream());
+
+      // 启动心跳线程
+      startHeartbeatThread(socketProtocol, serverHost);
 
       final ExecutorService service = Executors.newCachedThreadPool();
 
@@ -117,6 +127,28 @@ public class Client {
     } finally {
       log.info("Connection closed.");
     }
+  }
+
+  /** 启动心跳发送线程 */
+  private static void startHeartbeatThread(SocketProtocol protocol, String serverHost) {
+    Thread heartbeatThread =
+        new Thread(
+            () -> {
+              try {
+                while (true) {
+                  Thread.sleep(HEARTBEAT_INTERVAL);
+                  protocol.sendHeartbeat();
+                  log.debug("Heartbeat sent to {}", serverHost);
+                }
+              } catch (InterruptedException e) {
+                log.debug("Heartbeat thread interrupted for {}", serverHost);
+              } catch (IOException e) {
+                log.warn("Heartbeat failed for {}: {}", serverHost, e.getMessage());
+              }
+            },
+            "heartbeat-" + serverHost);
+    heartbeatThread.setDaemon(true);
+    heartbeatThread.start();
   }
 
   /**

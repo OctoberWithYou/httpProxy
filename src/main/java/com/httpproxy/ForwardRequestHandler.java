@@ -53,6 +53,9 @@ public class ForwardRequestHandler implements HttpHandler {
               try {
                 while (true) {
                   final Packet receive = socketProtocols.receive();
+                  if (receive == null) {
+                    continue;
+                  }
                   packets.put(receive);
                 }
               } catch (IOException | InterruptedException e) {
