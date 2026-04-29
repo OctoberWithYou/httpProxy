@@ -19,6 +19,9 @@ public class HttpServerProxy {
   public static void start() throws Exception {
     log.info("Starting HttpServerProxy...");
 
+    // 初始化 IP 白名单（从配置文件读取，支持热加载）
+    IpWhitelist.init();
+
     // 1. 初始化 SSLContext
     var sslContext = initSSLContext(KEYSTORE_PATH, KEYSTORE_PASSWORD);
 
@@ -46,15 +49,13 @@ public class HttpServerProxy {
     // 注册处理器：所有路径都交给 ForwardRequestHandler 处理
     final ForwardRequestHandler handler = new ForwardRequestHandler();
     httpsServer.createContext("/", handler);
+
     httpsServer.setExecutor(threadPool);
     Single.waitTcpConnect();
     handler.startReceive();
     httpsServer.start();
 
     log.info("HTTPS Proxy started on port {}", port);
-
-    // 可选：启动 HTTP 入口并重定向或同样处理
-    // startHttpEntryPoint(HTTP_PORT, threadPool);
   }
 
   /** 初始化 SSLContext */

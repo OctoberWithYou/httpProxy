@@ -6,7 +6,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.locks.ReentrantLock;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public class SocketProtocol {
 
   private final InputStream inputStream;
@@ -34,13 +36,22 @@ public class SocketProtocol {
         outputStream.write(packet.data());
       }
       outputStream.flush();
+
+      if (packet.isHeartbeat()) {
+        log.info("Sent heartbeat packet");
+      }
     } finally {
       outputStreamLock.unlock();
     }
   }
 
+  /** 发送心跳包 */
+  public void sendHeartbeat() throws IOException {
+    send(Packet.HEARTBEAT);
+  }
+
   /** 接收数据包 先读 8 字节 sessionId，再读 8 字节 size，最后读 data */
-  public synchronized Packet receive() throws IOException {
+  public Packet receive() throws IOException {
     inputStreamLock.lock();
     try {
       // 读取 8 字节 sessionId
@@ -76,7 +87,15 @@ public class SocketProtocol {
         }
       }
 
-      return new Packet(sessionId, sessionIdBytes, dataLength, sizeBytes, data);
+      Packet packet = new Packet(sessionId, sessionIdBytes, dataLength, sizeBytes, data);
+
+      // 心跳包特殊处理：记录日志并返回 null 让调用方继续等待
+      if (packet.isHeartbeat()) {
+        log.info("Received heartbeat packet");
+        return null;
+      }
+
+      return packet;
     } finally {
       inputStreamLock.unlock();
     }

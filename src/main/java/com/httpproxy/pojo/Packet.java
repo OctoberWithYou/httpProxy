@@ -13,6 +13,17 @@ import java.nio.ByteBuffer;
 public record Packet(
     long sessionId, byte[] sessionIdBytes, long size, byte[] sizeBytes, byte[] data) {
 
+  /** 心跳包的 sessionId 标识 */
+  public static final long HEARTBEAT_SESSION_ID = -1L;
+
+  /** 心跳包实例 */
+  public static final Packet HEARTBEAT = new Packet(HEARTBEAT_SESSION_ID, new byte[0]);
+
+  /** 判断是否为心跳包 */
+  public boolean isHeartbeat() {
+    return sessionId == HEARTBEAT_SESSION_ID;
+  }
+
   /**
    * 构造数据包，自动将会话ID和数据长度转换为字节数组。
    *
