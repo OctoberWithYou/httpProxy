@@ -138,10 +138,10 @@ public class Client {
                 while (true) {
                   Thread.sleep(HEARTBEAT_INTERVAL);
                   protocol.sendHeartbeat();
-                  log.debug("Heartbeat sent to {}", serverHost);
+                  log.info("Heartbeat sent to {}", serverHost);
                 }
               } catch (InterruptedException e) {
-                log.debug("Heartbeat thread interrupted for {}", serverHost);
+                log.info("Heartbeat thread interrupted for {}", serverHost);
               } catch (IOException e) {
                 log.warn("Heartbeat failed for {}: {}", serverHost, e.getMessage());
               }

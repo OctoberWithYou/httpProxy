@@ -38,7 +38,7 @@ public class SocketProtocol {
       outputStream.flush();
 
       if (packet.isHeartbeat()) {
-        log.debug("Sent heartbeat packet");
+        log.info("Sent heartbeat packet");
       }
     } finally {
       outputStreamLock.unlock();
@@ -91,7 +91,7 @@ public class SocketProtocol {
 
       // 心跳包特殊处理：记录日志并返回 null 让调用方继续等待
       if (packet.isHeartbeat()) {
-        log.debug("Received heartbeat packet");
+        log.info("Received heartbeat packet");
         return null;
       }
 

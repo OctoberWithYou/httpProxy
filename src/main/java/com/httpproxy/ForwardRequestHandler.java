@@ -75,7 +75,7 @@ public class ForwardRequestHandler implements HttpHandler {
                   if (runnable != null) {
                     runnable.apply(take);
                   } else {
-                    log.warn("No task found for sessionId: {}", take.sessionId());
+                    log.debug("No task found for sessionId: {}", take.sessionId());
                   }
                 }
               } catch (InterruptedException e) {
@@ -90,6 +90,17 @@ public class ForwardRequestHandler implements HttpHandler {
 
   @Override
   public void handle(HttpExchange exchange) throws IOException {
+    // IP 白名单检查 - 在任何处理之前
+    String clientIp = exchange.getRemoteAddress().toString();
+    if (!IpWhitelist.isAllowed(clientIp)) {
+      log.warn("Blocked request from {} (IP not in whitelist)", clientIp);
+      exchange.getResponseHeaders().set("Content-Type", "text/plain");
+      exchange.sendResponseHeaders(403, 0);
+      exchange.getResponseBody().write("Forbidden: IP not allowed".getBytes());
+      exchange.close();
+      return;
+    }
+
     final long sessionId = sessionIds.getAndIncrement();
     String requestMethod = exchange.getRequestMethod();
     String path = exchange.getRequestURI().getPath();

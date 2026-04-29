@@ -4,7 +4,6 @@ import com.httpproxy.util.SocketProtocol;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.security.KeyStore;
 import java.util.concurrent.Executors;
 import javax.net.ssl.*;
@@ -118,10 +117,10 @@ public class Server {
                 while (true) {
                   Thread.sleep(HEARTBEAT_INTERVAL);
                   protocol.sendHeartbeat();
-                  log.debug("Heartbeat sent to {}", clientIp);
+                  log.info("Heartbeat sent to {}", clientIp);
                 }
               } catch (InterruptedException e) {
-                log.debug("Heartbeat thread interrupted for {}", clientIp);
+                log.info("Heartbeat thread interrupted for {}", clientIp);
               } catch (IOException e) {
                 log.warn("Heartbeat failed for {}: {}", clientIp, e.getMessage());
               }
